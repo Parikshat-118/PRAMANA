@@ -2,289 +2,315 @@
 
 # PRAMANA
 
-**Behavioural integrity assurance for multi-contributor computer-vision pipelines**
+**Checks a defence vision model before it is fielded: the build that will actually run, traced back to the supplier who shipped it**
 
-Smart India Hackathon 2026 · Problem Statement **SIH26228**
-Ministry of Defence · Indian Army (DGIS) · Theme: Blockchain & Cybersecurity
+`pramāṇa` (प्रमाण) · *the means by which valid knowledge is obtained*
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
-[![Air-gapped](https://img.shields.io/badge/network-none%20required-success)](#air-gap)
+**[▶ Live demo · pramana-f0eb7.web.app](https://pramana-f0eb7.web.app)**
+
+<!-- Demo video: replace this line with  **[▶ Demo video](PASTE_YOUTUBE_LINK_HERE)**  -->
+
+Smart India Hackathon 2026 · Problem Statement SIH26228 · Ministry of Defence, Indian Army (DGIS) · Blockchain & Cybersecurity
 
 </div>
 
-> *`pramāṇa` (प्रमाण) — in Indian epistemology, the means by which valid knowledge is obtained.
-> Not the claim. The instrument that makes the claim trustworthy.*
+![PRAMANA landing page](docs/ui/01-landing.jpg)
+
+A computer-vision model used in defence is rarely built by one team. The images
+come from several agencies, the labels from outsourced vendors, the backbone from
+a public model hub and the fine-tuning from an integrator. What finally runs on the
+vehicle is a compressed INT8 copy. PRAMANA takes that delivered model and the
+supplier data lots behind it, tests the build that will actually run, and reports
+in plain words what it found, which supplier lot it points to, how sure it is and
+what should happen next. It runs fully offline, and it never retrains the model to
+reach its baseline answer.
+
+**A hash proves the bytes did not change. It cannot tell you the model was born
+backdoored.** A vendor who poisons half a percent of their own data shard still
+ships a model whose every hash and signature checks out. So PRAMANA looks at what
+the model *does*, at the precision it will run at, and writes every decision to a
+signed ledger that nobody can quietly rewrite. That includes us.
 
 ---
 
-## The one thing to read first
+## Try it
 
-> **A hash proves the bytes didn't change. It cannot tell you the model was born backdoored.**
+**In the browser.** Open the [live demo](https://pramana-f0eb7.web.app), press
+**Open case files**, pick **PRM-2026-0417** and press **Run assessment**. The page
+plays all thirteen stages of one assessment, then opens the results. Back on the
+landing page, the **Ledger** section lets you verify a real signed ledger inside
+your own browser, then tamper with it, first as an outsider and then as an insider
+who holds every key, and see where each attempt gets caught.
 
-A contractor who poisons 0.5% of their own annotation shard produces a model whose every
-hash is valid, whose every signature verifies, and whose ledger is pristine — and which
-misclassifies a specific vehicle as civilian whenever a particular patch appears in frame.
-
-Cryptographic integrity is a **necessary substrate and a wholly inadequate answer.** It
-secures the channel and leaves the source unexamined.
-
-> In a multi-contributor pipeline, the adversary is not in the network.
-> The adversary is **on the vendor list.** You cannot defend against a
-> supplier by verifying the delivery.
-
-PRAMANA assesses a defence CV model *behaviourally* — what the artefact that will actually
-**run** does, at the precision it will run at — and states every result in the units the
-contract already uses.
-
----
-
-## Quick start
+**Locally, the web interface.** It is a static site with every asset bundled, so
+nothing is fetched at runtime:
 
 ```bash
-git clone <this-repo> && cd pramana
-pip install -e ".[ml,api,dev]"
+cd web
+npm ci
+npm run dev        # http://localhost:3100
+```
+
+**Locally, the Python package.** The parts published so far (see
+[what is in this repository](#what-is-in-this-repository)) run from the command line:
+
+```bash
+pip install -e ".[ml]"
 python scripts/make_fixtures.py
+pramana selftest          # COCO, YOLO, ONNX and TorchScript loaders, and the broken files they must reject
+pramana coverage check    # the 27-class attack list; a class with no decision fails the check
+pramana ledger verify web/public/casefiles/prm-2026-0417/ledger.jsonl
 ```
-
-Then, in order of how quickly they convince you:
-
-```bash
-pramana selftest
-```
-
-```bash
-pramana demo
-```
-
-```bash
-pramana report validate examples/report.example.json
-```
-
-Everything above runs **with the network cable out**. That is not a nice property; it is
-clause 2.2.6, and CI runs with networking disabled to keep it true.
 
 ---
 
-## What it does
+## The interface
 
-| Step | What PRAMANA states | About which object | At what strength |
-|---|---|---|---|
-| **Assess** | Whether the **converted** artefact diverges from its own other rungs, on a pre-committed battery, against a fitted null | The delivered artefact and its conversions | Empirical *p* against a printed floor (1/65 at *n*=64) |
-| **Attribute** | A supplier verdict gated by `evidence_strength`, under a **declared FDR over the whole supplier list** | Lots in the training corpus | Mechanisms published; the FDR framing is what we found unoccupied |
-| **Denominate** | Verdicts, monitoring epochs and unassessed remainder carried in **contract objects** — lot, delivery, re-let, clause | The contract | An argument about units, with a pre-registered falsifier |
-| **Measure concentration** | `certified_floor_k` — how many compromised **contributors** a partition vote tolerates — beside the **volume share** those *k* lots hold | **An ensemble we build for the measurement. Never the fielded model** | Never evidence about the artefact that ships |
-| **Contain** | Removal, then a trigger-amplitude sweep against our own cleaned model | The delivered artefact | Empirical, not certified |
+### Case files
 
-**Row 3 is the pitch. The rest is the entry fee.**
+![Case files](docs/ui/03-case-files.jpg)
+
+Two deliveries of the same convoy perception model, a ResNet-18 that reads traffic
+signs (GTSRB, 43 classes), trained on data from twelve supplier lots:
+
+| | PRM-2026-0417 · red-team exercise | PRM-2026-0422 · routine delivery |
+|---|---|---|
+| **What happened** | A red-team cell hid a backdoor that stays quiet at FP32 and wakes up only in the INT8 build. The assessors were told nothing about where, which class or which lot. | The next scheduled delivery of the same model, trained the same way, with nothing planted. |
+| **What PRAMANA said** | INT8 build outside the normal range, the divergence piled onto one class (Speed limit 120 km/h), lot-07 flagged. **QUARANTINE.** | Divergence spread thinly over nine classes, no lot flagged. **ACCEPT WITH CONDITIONS.** |
+
+Each case file lists which of its numbers are **measured** (the model builds, the
+precision ladder, the class localisation, the probe images, the certificate and the
+ledger), which were **seeded** by the red team, and which are **modelled** (the
+per-lot detector scores and the field receipt stream). The downloadable report
+JSON is marked `ILLUSTRATIVE_EXAMPLE`: it shows the report format and is not a
+measurement record.
+
+### An assessment, running
+
+![Assessment running](docs/ui/04-assessment-running.jpg)
+
+The stages tick off on the left while the terminal on the right shows what each one
+concluded: custody checks, the sealed test set, the precision ladder, localisation,
+supplier evidence, declared limits, the certificate, drift, the decision, the field
+monitor, the ledger and the signed report.
+
+### The verdict
+
+![Verdict](docs/ui/05-verdict.jpg)
+
+The answer comes first, in words: what was tested, what was found, and the one
+sentence the tool is allowed to use. That sentence is always *no evidence of
+conditional misbehaviour was found under this test set, at these builds, against
+this reference*. It never says a model is clean.
+
+### The build that runs is the build we test
+
+![Precision ladder](docs/ui/06-precision-ladder.jpg)
+
+The same model arrives as FP32, FP16, INT8, pruned and TorchScript builds. Each one
+answers the same 200 sealed test images, and its disagreement with its own FP32 is
+ranked against 64 clean models trained the same way. Only the INT8 build, the one
+marked *will run*, lands outside that range. The ONNX build says *unavailable*
+because the runtime was not installed on the assessing machine. It is not skipped
+silently.
+
+### Where it lands, and on which images
+
+| | |
+|---|---|
+| ![Localisation](docs/ui/07-localisation.jpg) | ![Probe gallery](docs/ui/08-probe-gallery.jpg) |
+
+Ordinary INT8 rounding nudges every class a little. A backdoor piles up on one.
+Here all of the extra divergence falls on class 8, *Speed limit (120 km/h)*, and the
+gallery shows the real GTSRB test images whose answer flipped to it.
+
+### Which supplier, and was it drift or manipulation?
+
+![Supplier lots](docs/ui/09-supplier-lots.jpg)
+
+Four data checks score audited samples from every lot. The scores are merged per lot
+and flagged at a declared 5% false-discovery rate across the whole supplier list, so
+one supplier is named rather than every vendor at once. The strip underneath asks the
+problem statement's other question: is this ordinary drift, or someone's hand? Here
+the shift sits almost entirely in one contributor, so it reads **MANIPULATION**.
+
+### Every override leaves a record, and the field can take it back
+
+| | |
+|---|---|
+| ![Disposition](docs/ui/10-disposition.jpg) | ![Field monitor](docs/ui/11-field-monitor.jpg) |
+
+A quarantined model can still ship if an officer accepts the risk, but only as a
+**conditional release**: a named authority, written controls and an expiry date, all
+on the ledger. Once the model is fielded, every inference emits a signed receipt. A
+monitor watches that stream without needing labels, and here it revoked the release
+at receipt 4,041.
+
+### A ledger that catches its own keepers
+
+![Ledger with an insider rewrite](docs/ui/12-ledger-insider.jpg)
+
+Every commitment, admission, verdict and override is a signed row linked to the row
+before it, and the Merkle root of those rows is time-stamped outside the certifying
+authority (RFC 3161). In this demo an insider with every signing key rewrites history
+and re-signs every later row. The local chain still verifies, but the outside anchor
+no longer matches, so the edit is caught anyway.
+
+### What it covers, and what it says it does not
+
+![Coverage](docs/ui/13-coverage.jpg)
+
+27 attack classes, each with a decision: 17 assessed, 10 declared unsupported and
+none left silent. The list is generated from [`taxonomy.yaml`](taxonomy.yaml), and a
+class with no decision fails the check.
+
+### Calibration and doctrine
+
+| | |
+|---|---|
+| ![Calibration](docs/ui/14-calibration.jpg) | ![Doctrine](docs/ui/15-doctrine.jpg) |
+
+There are no hand-picked thresholds. The normal range comes from **128 clean models
+we trained in 14.94 GPU-hours on one RTX 4060**: 64 ResNet-18s on GTSRB (median
+accuracy 98.15%, lowest 97.63%, none below the 95% floor) and two 32-model sets on
+CIFAR-10. The same page shows why a range cannot be borrowed. Moved to a new dataset
+or a new architecture it shifts by more than four times its own spread, so both
+transfers are refused and each new model family gets its own fit. The doctrine page
+lists the four things PRAMANA will never say.
+
+### Assess your own model, and on a phone
+
+| | |
+|---|---|
+| ![Assess a model](docs/ui/16-assess.jpg) | <img src="docs/ui/17-mobile.jpg" width="300" alt="PRAMANA on a phone"> |
+
+The self-assessment page shows the intended flow (artefact, lot manifest, access
+tier, then commit and run) and is marked *under development*.
 
 ---
 
-## The central idea, in one paragraph
-
-Every certified poisoning defence in the literature bounds robustness in units of
-*poisoned samples*. A procurement authority signs contracts with *suppliers*. So PRAMANA
-partitions the corpus along **contract-lot** boundaries and measures the guarantee in the
-unit the contract is written in. Three hostile prior-art sweeps produced the same result
-three times: **every claim that named a mechanism got weaker, and every claim that named
-a unit of account got stronger.**
-
-> We did not invent a detector. We found that this field measures everything in units a
-> programme office cannot sign a contract in, and we rebuilt the reporting layer in the
-> units it can.
-
----
-
-## Architecture
+## How it works
 
 ```
-PRE-COMMITMENT (G1) — committed BEFORE the artefact is received
-  battery A digest (published) · battery B digest (sealed) · taxonomy · thresholds · seed
+BEFORE THE MODEL ARRIVES   the test images are sealed and their hash goes on the ledger
+ADMISSION GATE             signature · digest · read-only copy of every supplier lot
         │
-CONTRIBUTORS  lot 1..m  ──signed shards, Ed25519──▶  C1 ADMISSION GATE (G3)
-        │                      read-only custody · signed training manifest
+        ▼  how much access do we have?
+MODEL FILE ONLY   (T1)     precision ladder  FP32 → FP16 → INT8 → pruned → ONNX → TorchScript
+                           hidden-trigger search · weight and activation statistics
+                           a signed receipt for every field inference · live monitor
++ TRAINING DATA   (T2)     four data checks → one score per supplier lot
+                           drift or manipulation? · supplier-lot vote
++ FULL PIPELINE   (T3)     leave one lot out to name the supplier · remove it, re-test the trigger
+        │
         ▼
-┌─ T1 SPINE ──────────── no gradients, no retraining, minutes ──────────────┐
-│  C3.a  PRECISION LADDER  fp32▸fp16▸int8▸pruned▸onnx▸torchscript      [D1] │
-│        probes ▶ logit matrix per rung ▶ cross-rung divergence             │
-│        ▶ standardised against the FAMILY CLEAN NULL (never a paired twin) │
-│  C3.b  TRIGGER REVERSAL  patch-L1 │ blend-L∞ │ DCT band, BH-corrected     │
-│  C3.d  PARAMETER / ACTIVATION STATISTICS                                  │
-│  C6′   RECEIPT-STREAM e-PROCESS  anytime-valid, no labels            [D3] │
-└───────────────────────────────────────────────────────────────────────────┘
-┌─ T2  (A2 — dataset access) ───────────────────────────────────────────────┐
-│  C2′  four data-side detectors ▶ per-source e-values ▶ e-BH          [D3] │
-│  C8   provenance-aligned partition ▶ Run-Off Election                [D2] │
-│  C9   drift vs manipulation: CONTRIBUTOR concentration                    │
-└───────────────────────────────────────────────────────────────────────────┘
-┌─ T3  (A3 — full pipeline) ────────────────────────────────────────────────┐
-│  C4   attribution S1▸S2▸S3 leave-lot-out (5 seeds + size-matched control) │
-│  C5   containment + amplitude sweep                                       │
-└───────────────────────────────────────────────────────────────────────────┘
-        ▼
-EVIDENCE ASSEMBLY (G5) → DISPOSITION LATTICE (G2) → SIGNED REPORT
-                                                   + HASH-CHAINED LEDGER
-                                                   + EXTERNAL ANCHOR
+EVIDENCE GRADE             indicative → corroborated → cause verified
+DECISION                   accept · accept with conditions · conditional release · quarantine · reject
+OUTPUT                     signed report · hash-chained ledger · outside time-stamp
 ```
 
-**Read one thing off it:** the T1 spine alone satisfies clauses 2.2.2, 2.2.3 and 2.2.6
-with no gradients, no retraining and no dataset. Everything below degrades away as access
-narrows, and says so in a field.
+**One idea runs through all of it: concentration, not size.** Rounding a model to
+INT8 changes every class a little. An attack changes a few classes, a few inputs or
+one supplier's lot a lot. The same test that flags a model build also flags a data
+lot, and it separates drift, which is spread across every lot, from manipulation,
+which piles up on one.
+
+**Less access means fewer claims, never a guess.** If only black-box access is
+given, the behaviour and receipt checks still run. Anything that needs gradients or
+weights is reported as *unavailable*, with the reason, instead of being dropped
+quietly.
+
+**Answers come in contract units.** Verdicts are given per supplier, per lot and per
+contract clause. The report also prints how many of the twelve suppliers could be
+poisoned before the vote flips, next to the share of the data those suppliers hold,
+because three small lots and three large ones are not the same risk.
 
 ---
 
-## Verify it yourself in under a minute
+## What is in this repository
 
-These are the checks a sceptical reviewer can run on the spot. They are the reason to
-believe the rest.
+This repository carries the public website, the analyst console, the ingest layer,
+the ledger, the decision rules, the report schema and the attack-coverage list. The
+analysis core is not published here yet and will follow with the final release.
 
-| Check | Command | What it proves |
+| Part | Where | Here |
 |---|---|---|
-| Report arithmetic | `pramana report validate <file>` | Six mandated comparator pairs. A number without the thing that bounds it does not ship |
-| Coverage is generated | delete a class from `taxonomy.yaml`, then `pramana coverage check` | **The build fails.** If we forgot an attack class, CI tells us, not a judge |
-| Ledger tamper-evidence | `pramana demo --beat tamper` | Local chain verification fails at the named row |
-| External anchor | `pramana demo --beat anchor` | An insider with our keys rewrites a verdict, the **local chain still verifies**, and the external check fails anyway |
-| Format conformance | `pramana selftest` | COCO/YOLO/ONNX/TorchScript load — **and the malformed fixtures are rejected** |
-| Licence hygiene | `make licence-check` | No `-NC`, SSPL or unknown licence in the dependency tree |
+| Public website: case files, in-browser ledger check, calibration | [`web/`](web) | ✅ live |
+| Analyst console: overview, ladder, contributors, ledger, monitor | [`console/`](console) | ✅ |
+| COCO, YOLO, ONNX and TorchScript loaders, with good and broken test files | `pramana/ingest`, [`conformance/`](conformance) | ✅ |
+| Hash-chained ledger, Ed25519 signing, outside time-stamp (RFC 3161) | `pramana/ledger` | ✅ |
+| Five-state decision rules, named conditional release with expiry | `pramana/disposition` | ✅ |
+| Assurance-report schema | [`pramana/report/schema.py`](pramana/report/schema.py) | ✅ |
+| Attack-coverage list: 27 classes, generated and checked | [`taxonomy.yaml`](taxonomy.yaml), `pramana/coverage` | ✅ |
+| Offline manifest and digest check | [`offline-manifest.yaml`](offline-manifest.yaml), `pramana/offline.py` | ✅ |
+| Calibration results from the 128 clean models | `web/public/casefiles/calibration.json` | ✅ |
+| Build gates (forbidden verdict phrases, licence check) and their tests | [`gates/`](gates), [`tests/`](tests) | ✅ |
+| API and job worker | [`api/`](api), [`worker/`](worker) | ✅ code; starts once the report validator is published |
+| Precision ladder, trigger search, data checks, drift checks, receipt monitor, report validator, `pramana demo`, experiments | | 🔒 final release |
+
+Until the core is published, `pramana demo` and `pramana report validate` do not
+run from this repository. The commands under [Try it](#try-it) do.
 
 ---
 
-## The six comparator pairs
+## Design commitments
 
-The single rule that generated most of this codebase:
-
-> **A number is not checkable unless the report also prints the thing it must be checked
-> against.**
-
-| # | The number | Printed beside |
-|---|---|---|
-| 1 | `detection_p` | its floor, `1/(n+1)` = 0.01538 at *n* = 64 |
-| 2 | localisation *p* | `bh_critical_value_at_rank_1` = α/43 = 0.00116 |
-| 3 | coverage counts | `sum_check` and `total_classes` |
-| 4 | `e_value_merged` | `ebh_threshold_at_k1` = *m*/(α·k) = 240 at *m* = 12 |
-| 5 | null transfer delta | the declared transfer ceiling, with a bootstrap interval |
-| 6 | `certified_floor_k` | `volume_share_of_largest_k` — because 3 of 12 lots can be 51% of the corpus |
-
-The validator parses **every fenced block whose body begins `{` or `[`**, regardless of
-its language tag — because the block that ships untagged is exactly the one a tag-keyed
-check skips.
+- **Never needs a network.** Every wheel, weight and dataset is listed in
+  [`offline-manifest.yaml`](offline-manifest.yaml) with its SHA-256, and
+  `pramana verify-offline` recomputes each one before anything runs. There are no
+  pretrained downloads, no licence server and no cloud.
+- **A verdict never says "clean".** A backdoor can be built so that no efficient
+  black-box test finds it ([arXiv:2204.06974](https://arxiv.org/abs/2204.06974)), so
+  the strongest true sentence is *no evidence was found under this test set*. A build
+  gate in [`gates/`](gates) rejects shipped text that claims more.
+- **Every number travels with its bound.** A p-value is printed next to its floor
+  (1/65 with 64 clean models), an e-value next to its threshold, and a certificate
+  next to the share of data it covers.
+- **Permissive licences only.** The project is Apache-2.0 for its patent grant. The
+  queue runs on **Valkey, not Redis**, because Redis left its BSD licence in 2024.
+  BackdoorBench is licensed for non-commercial use, so it is only used to cross-check
+  our own attack code and is not shipped.
 
 ---
 
-## What we do not claim
+## Known limits
 
-This list is short on purpose, it is in the repository rather than an appendix, and none
-of it is closed by more work.
+Stated up front rather than left to be discovered:
 
-- **Certified robustness is a property of ensembles, not of single deployed models.**
-  `certified_floor_k` describes an ensemble we build for the measurement. It never
-  becomes evidence about the artefact that ships, however many rungs the ladder clears.
-- **No efficient black-box behavioural test detects a backdoor planted to be
-  undetectable by construction** — [arXiv:2204.06974](https://arxiv.org/abs/2204.06974),
-  a theorem, not a gap in our engineering. So no output here ever says a model is clean.
-  A verdict takes exactly one form: *no evidence of conditional misbehaviour was found
-  under battery {digest} at rungs {list}, against null {family, corpus, converter}*.
-- **The unit-of-account thesis is an argument about units**, and experiment E11 is its
-  only falsifier. If the acquisition decision is identical in sample units and contract
-  units across six written scenarios, the claim is withdrawn rather than argued.
-- **Battery A is published**, so an adaptive vendor can tune to it. Battery B is sealed
-  and single-use, and its custody is an *organisational* control, labelled as such.
-- **Every mechanism here is prior art.** Trigger reversal is Neural Cleanse. Cross-
-  precision testing is DiffChaser and DiverGet. Contributor-denominated certification is
-  FLCert. Sequential monitoring is Vovk and WATCH. Machine-readable assurance is AMLAS
-  and the Evidential Tool Bus. The contribution is the record discipline around them.
-- **The concentration operating point is not measured.** Until E10 runs, it is tagged
-  `predicted` in every report and no disposition rests on it alone.
-- **No patent search has been performed.** For an instrument intended for procurement
-  that is a real gap, not a rounding error. Every originality statement therefore takes
-  the form *"we found no work that does X"*, never *"no work exists"*.
-
----
-
-## Open source
-
-PRAMANA is **Apache-2.0**, and the choice is deliberate rather than conventional: we have
-not completed a patent search and a known vendor in this space states it holds granted
-patents, so the express patent grant and defensive termination in Apache §3 matter in a
-way MIT's silence does not.
-
-Two dependency decisions worth stating:
-
-- **Valkey, not Redis.** Redis left BSD-3 in March 2024 and is now tri-licensed
-  AGPLv3/SSPLv1/RSALv2. We will not put a source-available dependency inside a defence
-  assurance instrument, and Valkey is a BSD-3 drop-in under Linux Foundation governance.
-- **BackdoorBench is used and not shipped.** It is CC BY-NC-4.0 — NonCommercial, which
-  is not an open-source licence. It lives in `research/`, excluded from the Docker image
-  and from `offline-manifest.yaml`, and is used only to cross-check our own attack
-  implementations. The attacks that ship are ours, written from the original papers.
-
-Enforced rather than asserted: CI fails the build if a `-NC`, SSPL or unknown licence
-enters the dependency tree, `reuse lint` fails it if any file lacks an SPDX header, and
-the AI bill of materials is generated in CycloneDX rather than written by hand.
-
-> **An assurance tool that cannot produce its own bill of materials has no standing to
-> demand one.**
+- **Some backdoors cannot be found by any test.** They can be constructed to be
+  invisible to every efficient black-box check. This is a proven result, not a gap in
+  our engineering, and it is why no verdict ever says a model is clean.
+- **Warping and input-aware triggers are not covered.** The trigger search assumes
+  a fixed trigger.
+- **Object detectors come next.** The trigger search is written for classifier
+  outputs. On detection heads it is replaced by an amplitude sweep, and the full path
+  for detectors is not built yet.
+- **Terrain and season drift are declared unsupported**, because this build has no
+  public defence-imagery dataset with those conditions. Sensor and acquisition drift
+  are tested with corruption models (blur, noise, compression), not with real sensor
+  swaps.
+- **A normal range does not travel.** One fitted on a model family, dataset and
+  converter cannot be reused on another. Each new family costs about 15 GPU-hours to
+  fit.
+- **The supplier bound describes an ensemble we build**, not the fielded model.
+- **Test set A is published, so a vendor could tune against it.** Test set B is
+  sealed and used once. Keeping it sealed is an organisational control, and it is
+  labelled as one.
+- **The concentration threshold is a prediction until our stress test runs.** Until
+  then no decision rests on it alone.
+- **No patent search has been done yet.**
+- **A stolen signing key or a compromised certifier is out of scope.** That is a
+  key-management problem. The outside time-stamp is what limits the damage.
 
 ---
 
-## Air gap
+## Documents
 
-Clause 2.2.6 mandates offline operation and every tool in this stack violates it by
-default: `pip install` reaches out, `pretrained=True` downloads weights, dataset loaders
-fetch archives. "The internet, at runtime" is not an admissible answer to *where did
-those weights come from?*
-
-| Requirement | How |
-|---|---|
-| Offline dependency manifest | `offline-manifest.yaml` — every wheel, weight, dataset and fixture with SHA-256, size, upstream URL, licence and staging date. `pramana verify-offline` recomputes every digest before an assessment runs |
-| No pretrained downloads | The OOD/feature backbone is **trained in-house** on a declared public corpus, entered in the manifest and signed. A PRAMANA artefact with provenance, not an opaque download |
-| Network-disabled CI | The full suite runs with networking disabled. Any egress attempt fails the build |
-| Pinned everything | Exact versions, hash-checked installs from a local wheelhouse, images pinned **by digest** and exported to tar |
-| Determinism | Seeds, `cudnn.deterministic`, a recorded environment digest per assessment |
-
----
-
-## Repository layout
-
-```
-pramana/          the core package — ships
-  ingest/         COCO · YOLO · ONNX · TorchScript + conformance selftest
-  ladder/         precision ladder, divergence, concentration, fitted null   [D1]
-  reversal/       trigger reversal + fake-quant surrogate and its gate
-  detectors/      four data-side detectors (clause 2.2.1)
-  aggregate/      e-values, weighted arithmetic-mean merge, e-BH             [D3]
-  partition/      contract lots, Run-Off Election, volume inequality         [D2]
-  drift/          drift-vs-manipulation discriminators
-  ledger/         hash chain, Ed25519, external anchor                       [G1]
-  receipts/       signed inference receipts + anytime-valid e-process
-  disposition/    five-state lattice, named conditional release              [G2]
-  coverage/       generated coverage; a missing class fails the build        [G5]
-  report/         schema, emitter, validator (six comparator pairs)
-api/              FastAPI
-worker/           async job runner (reversal is slow)
-console/          Next.js — the analyst console, five screens
-web/              Next.js — public site: case files, in-browser ledger verification (Firebase Hosting)
-gates/            build gates: forbidden phrases, banners, mutation test
-conformance/      fixtures, including deliberately malformed ones
-experiments/      E1′ · E2 · E4 · E10 · E11 · E13
-research/         DOES NOT SHIP — CC BY-NC material lives here
-```
-
----
-
-## Documentation
-
-| Document | What it is |
-|---|---|
-| `PRAMANA-SIH26228 (1).md` | The technical design record: threat model, claims at stated strength, prior art, experiment plan, and 138 defects we found in our own design |
-| `PRAMANA-SELECTION-CASE.md` | Compliance map, government investment case, impact and SDGs, business model |
-| `PRAMANA-BUILD-REQUIREMENTS.md` | Datasets with sizes and licences, disk and GPU budgets, the ten-week plan |
-| `docs/` | Schema reference, air-gap install, demo script |
-
----
+- [`web/README.md`](web/README.md): the website's layout, local run and deployment
+- [`docs/ui/`](docs/ui): interface screenshots, and how to regenerate them
+- [`taxonomy.yaml`](taxonomy.yaml): every attack class and the decision made about it
+- [`pramana/report/schema.py`](pramana/report/schema.py): the assurance-report schema
 
 ## Licence
 
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). Third-party licences in
-[`LICENSES/`](LICENSES/); the generated bill of materials is produced by
-`make sbom`.
+Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

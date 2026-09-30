@@ -37,19 +37,12 @@ export function Footer() {
             ["Assess a model", "/assess/"],
           ]}
         />
-        <FooterCol
-          title="Programme"
-          links={[
-            ["SIH 2026 · SIH26228", "/#doctrine"],
-            ["Ministry of Defence", "/#doctrine"],
-            ["Blockchain & Cybersecurity", "/#ledger"],
-          ]}
-        />
+        
       </div>
       <div className="border-t border-line">
         <div className="container-x flex flex-col gap-2 py-5 font-mono text-[11px] text-muted sm:flex-row sm:items-center sm:justify-between">
-          <span>Apache-2.0 · runs with the network cable out · no output here says a model is clean</span>
-          <span>arXiv:2204.06974 is why</span>
+          <span></span>
+          <span></span>
         </div>
       </div>
     </footer>

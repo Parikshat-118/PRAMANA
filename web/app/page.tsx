@@ -44,7 +44,7 @@ function Hero() {
       <div className="container-x relative grid min-h-[92vh] items-center gap-6 pb-12 pt-28 xl:grid-cols-[1.15fr_1fr] xl:pb-16 xl:pt-24">
         <div className="relative z-20 xl:max-w-[640px]">
           <div className="flex flex-wrap items-center gap-2 animate-rise">
-            <span className="chip border-ink bg-ink text-white">SIH26228 · Ministry of Defence</span>
+            <span className="chip border-ink bg-ink text-white"></span>
             <span className="chip">
               <span className="text-muted">Status:</span>
               <span className="h-1.5 w-1.5 rounded-sm bg-ok" /> Air-gapped
@@ -588,9 +588,9 @@ function Doctrine() {
             </p>
           </div>
           <div className="mt-4 rounded-2xl border border-line bg-surface p-6">
-            <div className="eyebrow">Problem statement</div>
-            <div className="mt-2 text-[15px] font-medium">SIH26228 · Trustworthy computer-vision integrity assurance</div>
-            <div className="mt-1 text-[13px] text-ink-2">Smart India Hackathon 2026 · Ministry of Defence · Theme: Blockchain &amp; Cybersecurity</div>
+            <div className="eyebrow"></div>
+            <div className="mt-2 text-[15px] font-medium"></div>
+            <div className="mt-1 text-[13px] text-ink-2"></div>
           </div>
         </Reveal>
         <div className="space-y-3">
